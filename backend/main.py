@@ -16,14 +16,12 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain, hashed):
-    # Bcrypt has a 72-byte limit - encode to bytes, truncate, decode back
-    truncated = plain.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.verify(truncated, hashed)
+    # Bcrypt has a 72-byte limit
+    return pwd_context.verify(plain[:72], hashed)
 
 def get_password_hash(password):
-    # Bcrypt has a 72-byte limit - encode to bytes, truncate, decode back
-    truncated = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(truncated)
+    # Bcrypt has a 72-byte limit  
+    return pwd_context.hash(password[:72])
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -87,8 +85,11 @@ def register(user: UserCreate):
         if existing.data:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # Hash password
-        hashed = get_password_hash(user.password)
+        # Truncate password to 72 chars to ensure bcrypt compatibility
+        safe_password = user.password[:72]
+        
+        # Hash
+        hashed = get_password_hash(safe_password)
         uid = str(uuid.uuid4())
         is_admin = user.email == "tauhidur.sifat@gmail.com"
         
