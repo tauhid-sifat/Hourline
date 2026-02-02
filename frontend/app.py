@@ -345,6 +345,59 @@ def get_month_dates(year, month):
     all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
     return start_date, end_date, all_dates
 
+def parse_time_input(time_str):
+    """Parse time string in various formats to time object.
+    Supported formats:
+    - HH:MM (24-hour): '14:30', '09:00'
+    - HH:MM AM/PM (12-hour): '2:30 PM', '9:00 AM'
+    - Fragment: '230' -> 2:30, '1430' -> 14:30
+    Returns (time_object, error_message)
+    """
+    if not time_str or not time_str.strip():
+        return None, None
+    
+    time_str = time_str.strip()
+    
+    try:
+        # Try HH:MM format (24-hour)
+        if ':' in time_str and ('AM' not in time_str.upper() and 'PM' not in time_str.upper()):
+            parts = time_str.split(':')
+            if len(parts) == 2:
+                hour = int(parts[0])
+                minute = int(parts[1])
+                if 0 <= hour <= 23 and 0 <= minute <= 59:
+                    return datetime.strptime(time_str, '%H:%M').time(), None
+        
+        # Try HH:MM AM/PM format (12-hour)
+        elif 'AM' in time_str.upper() or 'PM' in time_str.upper():
+            for fmt in ['%I:%M %p', '%I:%M%p', '%I %p', '%I%p']:
+                try:
+                    return datetime.strptime(time_str.upper(), fmt).time(), None
+                except:
+                    continue
+        
+        # Try fragment format (no colon)
+        elif time_str.isdigit():
+            if len(time_str) == 3:  # e.g., '230' -> 2:30
+                hour = int(time_str[0])
+                minute = int(time_str[1:3])
+            elif len(time_str) == 4:  # e.g., '1430' -> 14:30
+                hour = int(time_str[0:2])
+                minute = int(time_str[2:4])
+            elif len(time_str) <= 2:  # e.g., '9' -> 9:00, '14' -> 14:00
+                hour = int(time_str)
+                minute = 0
+            else:
+                return None, "Invalid time format. Use HH:MM, HH:MM AM/PM, or fragments like 230 or 1430"
+            
+            if 0 <= hour <= 23 and 0 <= minute <= 59:
+                return datetime.strptime(f"{hour:02d}:{minute:02d}", '%H:%M').time(), None
+        
+        return None, "Invalid time format. Use HH:MM, HH:MM AM/PM, or fragments like 230 or 1430"
+    
+    except Exception as e:
+        return None, f"Could not parse time: {str(e)}"
+
 # --- DIALOGS ---
 @st.dialog("Log Correction")
 def manual_entry_dialog(default_date=None):
@@ -363,17 +416,45 @@ def manual_entry_dialog(default_date=None):
         
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            m_in = st.time_input("Clock In", value=None, disabled=is_locked)
+            m_in_str = st.text_input(
+                "Clock In", 
+                value="",
+                placeholder="e.g., 09:30 or 9:30 AM",
+                disabled=is_locked,
+                help="Enter time as HH:MM (24-hour) or HH:MM AM/PM"
+            )
         with col_t2:
-            m_out = st.time_input("Clock Out", value=None, disabled=is_locked)
+            m_out_str = st.text_input(
+                "Clock Out", 
+                value="",
+                placeholder="e.g., 18:00 or 6:00 PM",
+                disabled=is_locked,
+                help="Enter time as HH:MM (24-hour) or HH:MM AM/PM"
+            )
             
-        if is_locked and (m_in or m_out):
-            st.warning("Switching to Leave/Holiday will clear these times.")
-            # We can't auto-clear inputs easily without session state callback or rerun, 
-            # but backend validation will block it if user persists.
-        
         submitted = st.form_submit_button("Save Record", type="primary")
         if submitted:
+            # Parse time inputs
+            m_in = None
+            m_out = None
+            has_error = False
+            
+            if not is_locked:
+                if m_in_str:
+                    m_in, error = parse_time_input(m_in_str)
+                    if error:
+                        st.error(f"Clock In: {error}")
+                        has_error = True
+                
+                if m_out_str:
+                    m_out, error = parse_time_input(m_out_str)
+                    if error:
+                        st.error(f"Clock Out: {error}")
+                        has_error = True
+            
+            if has_error:
+                st.stop()
+            
             payload = {
                 "user_id": st.session_state.user_id,
                 "date": str(m_date),
