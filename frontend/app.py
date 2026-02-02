@@ -7,8 +7,8 @@ import calendar
 import os
 
 # Config
-# Default to local if not set
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+# Default to local if not set. Use 127.0.0.1 to avoid Windows localhost/IPv6 issues.
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="Hourline", layout="wide", page_icon="⏱️")
 
