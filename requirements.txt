@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+streamlit
+python-dotenv
+pydantic
+pandas
+httpx
+passlib[bcrypt]
+pyjwt
+email-validator
