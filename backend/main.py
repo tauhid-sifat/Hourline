@@ -8,9 +8,10 @@ from .calculations import calculate_worked_minutes
 import uuid
 from passlib.context import CryptContext
 import jwt
+import os
 
 # Auth Config
-SECRET_KEY = "super-secret-key-please-change-in-prod"
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-please-change-in-prod")
 ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -73,40 +74,50 @@ def calculate_required_dynamic(day_type: str, settings: dict) -> int:
 @app.post("/auth/register", response_model=UserResponse)
 def register(user: UserCreate):
     conn = get_db_connection()
-    c = conn.cursor()
-    
-    # Check existing
-    row = c.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
-    if row:
+    try:
+        c = conn.cursor()
+        print(f"[DEBUG] Registering {user.email}...")
+        
+        # Check existing
+        row = c.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
+        if row:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Hash
+        print("[DEBUG] Hashing password...")
+        hashed = get_password_hash(user.password)
+        print("[DEBUG] Hashing complete.")
+        uid = str(uuid.uuid4())
+        is_admin = 1 if user.email == "tauhidur.sifat@gmail.com" else 0
+        
+        c.execute("INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)",
+                  (uid, user.email, user.name, hashed, is_admin))
+        conn.commit()
+        print("[DEBUG] User committed to DB.")
+        
+        return {"id": uid, "email": user.email, "name": user.name, "is_admin": bool(is_admin), "created_at": datetime.now()}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         conn.close()
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Hash
-    hashed = get_password_hash(user.password)
-    uid = str(uuid.uuid4())
-    is_admin = 1 if user.email == "tauhidur.sifat@gmail.com" else 0
-    
-    c.execute("INSERT INTO users (id, email, name, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)",
-              (uid, user.email, user.name, hashed, is_admin))
-    conn.commit()
-    conn.close()
-    
-    return {"id": uid, "email": user.email, "name": user.name, "is_admin": bool(is_admin), "created_at": datetime.now()}
 
 @app.post("/auth/login", response_model=Token)
 def login(creds: UserLogin):
     conn = get_db_connection()
-    row = conn.execute("SELECT * FROM users WHERE email = ?", (creds.email,)).fetchone()
-    conn.close()
-    
-    if not row or not verify_password(creds.password, row['password_hash']):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    
-    # Generate Token
-    token = create_access_token({"sub": row['id'], "email": row['email'], "name": row['name'], "is_admin": row['is_admin']})
-    
-    user_data = {"id": row['id'], "email": row['email'], "name": row['name'], "is_admin": bool(row['is_admin']), "created_at": row['created_at']}
-    return {"access_token": token, "token_type": "bearer", "user": user_data}
+    try:
+        row = conn.execute("SELECT * FROM users WHERE email = ?", (creds.email,)).fetchone()
+        
+        if not row or not verify_password(creds.password, row['password_hash']):
+            raise HTTPException(status_code=401, detail="Incorrect email or password")
+        
+        # Generate Token
+        token = create_access_token({"sub": row['id'], "email": row['email'], "name": row['name'], "is_admin": row['is_admin']})
+        
+        user_data = {"id": row['id'], "email": row['email'], "name": row['name'], "is_admin": bool(row['is_admin']), "created_at": row['created_at']}
+        return {"access_token": token, "token_type": "bearer", "user": user_data}
+    finally:
+        conn.close()
 
 @app.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):

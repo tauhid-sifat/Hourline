@@ -4,8 +4,11 @@ import pandas as pd
 from datetime import datetime, timedelta, date
 import calendar
 
+import os
+
 # Config
-API_URL = "http://localhost:8000"
+# Default to local if not set
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="Hourline", layout="wide", page_icon="⏱️")
 
@@ -226,6 +229,8 @@ st.markdown(NORD_CSS, unsafe_allow_html=True)
 # Session State & Auth Simulation
 if 'user' not in st.session_state:
     st.session_state.user = None
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
 
 # --- AUTH UI ---
 def render_auth():
@@ -297,7 +302,8 @@ def render_auth():
                 else:
                     try:
                         payload = {"email": r_email, "password": r_pass, "name": r_name}
-                        res = httpx.post(f"{API_URL}/auth/register", json=payload)
+                        # Increased timeout to 30s for slow environments
+                        res = httpx.post(f"{API_URL}/auth/register", json=payload, timeout=30.0)
                         if res.status_code == 200:
                             st.success("Account created! Please login.")
                         else:
@@ -852,7 +858,6 @@ def render_dashboard(settings, is_active_session=False):
         st.error(f"Backend Error: {e}")
 
 # Run
-if st.session_state.user_id:
+# Run
+if __name__ == "__main__":
     main_app()
-else:
-    login_screen()
