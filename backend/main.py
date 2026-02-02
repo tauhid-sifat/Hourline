@@ -16,12 +16,14 @@ ALGORITHM = "HS256"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain, hashed):
-    # Bcrypt has a 72-byte limit, truncate if necessary
-    return pwd_context.verify(plain[:72], hashed)
+    # Bcrypt has a 72-byte limit - encode to bytes, truncate, decode back
+    truncated = plain.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+    return pwd_context.verify(truncated, hashed)
 
 def get_password_hash(password):
-    # Bcrypt has a 72-byte limit, truncate if necessary
-    return pwd_context.hash(password[:72])
+    # Bcrypt has a 72-byte limit - encode to bytes, truncate, decode back
+    truncated = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
+    return pwd_context.hash(truncated)
 
 def create_access_token(data: dict):
     to_encode = data.copy()
