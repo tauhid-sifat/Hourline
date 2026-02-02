@@ -61,7 +61,7 @@ Add these in Render's **Environment** section:
 ### 2.4 Deploy
 - Click **Create Web Service**
 - Wait for deployment (5-10 minutes)
-- Note your backend URL: `https://hourline-backend.onrender.com`
+- Backend URL: `https://hourline.onrender.com`
 
 ---
 
@@ -81,12 +81,12 @@ Ensure `frontend/app.py` is the main file.
 ### 3.3 Environment Variables (Secrets)
 In Streamlit Cloud, add this to the **Secrets** section:
 ```toml
-API_URL = "https://hourline-backend.onrender.com"
+API_URL = "https://hourline.onrender.com"
 ```
 
 ### 3.4 Deploy
 - Click **Deploy**
-- Your app will be live at: `https://[your-app-name].streamlit.app`
+- Your app will be live at: `https://hourline.streamlit.app`
 
 ---
 
@@ -104,14 +104,54 @@ API_URL = "https://hourline-backend.onrender.com"
 - ✅ Monthly History
 - ✅ Settings persist
 
+**Live App**: https://hourline.streamlit.app
+
+---
+
+## Common Deployment Errors
+
+### Error: "Port scan timeout reached, no open ports detected"
+
+**Cause**: The app isn't starting properly or crashing before binding to the port.
+
+**Solutions**:
+
+1. **Check Render Logs**:
+   - Go to your service in Render Dashboard
+   - Click on **Logs** tab
+   - Look for Python errors (import errors, missing modules, etc.)
+
+2. **Verify Build Command**:
+   - Should be: `pip install -r requirements.txt`
+   - Make sure `requirements.txt` includes ALL dependencies
+
+3. **Verify Start Command**:
+   - Should be: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+   - Note: Must use `$PORT` (Render's environment variable)
+
+4. **Check Environment Variables**:
+   - Ensure `SUPABASE_URL` and `SUPABASE_KEY` are set
+   - Missing env vars can cause import errors
+
+5. **Test Locally First**:
+   ```bash
+   PORT=8000 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+   ```
+   - If this fails locally, fix the error before deploying
+
+6. **Common Import Errors**:
+   - Check that `python-dotenv` is in `requirements.txt`
+   - Verify all relative imports work (`from .db import ...`)
+
 ---
 
 ## Troubleshooting
 
 ### Backend Issues
-- **500 Error**: Check Render logs for Python errors
+- **500 Error**: Check Render logs at https://dashboard.render.com
 - **Connection Refused**: Verify `SUPABASE_URL` and `SUPABASE_KEY`
 - **Slow Response**: Render free tier spins down after inactivity (cold start ~30s)
+- **Test Backend**: Visit https://hourline.onrender.com/docs to see API docs
 
 ### Frontend Issues
 - **Can't Connect**: Verify `API_URL` in Streamlit secrets matches Render URL
